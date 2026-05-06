@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Research Agent · Discovery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=JetBrains+Mono:wght@300;400;500&family=Lato:wght@300;400&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #0c0c0f;
+    --surface:   #13131a;
+    --border:    #1e1e2e;
+    --border-hi: #2e2e45;
+    --text:      #d4d0c8;
+    --muted:     #5a5870;
+    --accent:    #c9a96e;
+    --accent2:   #7c9eb2;
+    --green:     #6dab8a;
+    --red:       #c97070;
+    --mono:      'JetBrains Mono', monospace;
+    --serif:     'Playfair Display', Georgia, serif;
+    --sans:      'Lato', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── noise texture overlay ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── layout ── */
+  .shell {
+    position: relative; z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  /* ── header ── */
+  header {
+    display: flex; align-items: flex-end; gap: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 28px; margin-bottom: 44px;
+  }
+  .logo-mark {
+    width: 42px; height: 42px; flex-shrink: 0;
+    border: 1px solid var(--accent);
+    display: grid; place-items: center;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--accent); letter-spacing: 0.05em;
+  }
+  .header-text h1 {
+    font-family: var(--serif);
+    font-size: 22px; font-weight: 600;
+    letter-spacing: 0.02em; color: #e8e4da;
+  }
+  .header-text p {
+    font-size: 12px; color: var(--muted);
+    font-family: var(--mono); margin-top: 3px;
+  }
+
+  /* ── form ── */
+  .query-form { margin-bottom: 36px; }
+
+  label.field-label {
+    display: block;
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 8px;
+  }
+
+  textarea#query {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+    font-family: var(--sans); font-size: 15px; font-weight: 300;
+    padding: 14px 16px;
+    resize: vertical; min-height: 72px;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.6;
+  }
+  textarea#query:focus { border-color: var(--accent); }
+  textarea#query::placeholder { color: var(--muted); }
+
+  .form-row {
+    display: flex; gap: 12px; margin-top: 12px;
+    align-items: center; flex-wrap: wrap;
+  }
+
+  select#doctype {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+    font-family: var(--mono); font-size: 11px;
+    padding: 10px 14px; outline: none;
+    cursor: pointer; transition: border-color 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a5870'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    padding-right: 32px;
+  }
+  select#doctype:focus { border-color: var(--accent); }
+
+  button#run-btn {
+    background: var(--accent);
+    color: #0c0c0f;
+    border: none; border-radius: 2px;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 10px 24px; cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    font-weight: 500;
+  }
+  button#run-btn:hover { opacity: 0.88; }
+  button#run-btn:active { transform: scale(0.98); }
+  button#run-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── progress pipeline ── */
+  .pipeline {
+    display: none;
+    margin-bottom: 36px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .pipeline.visible { display: block; }
+
+  .pipeline-header {
+    background: var(--surface);
+    padding: 10px 16px;
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .spinner {
+    width: 10px; height: 10px;
+    border: 1.5px solid var(--border-hi);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+  .spinner.done { animation: none; border-color: var(--green); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .log-lines {
+    padding: 12px 0;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .log-line {
+    display: flex; gap: 12px; align-items: baseline;
+    padding: 3px 16px;
+    font-family: var(--mono); font-size: 11px;
+    animation: fadein 0.2s ease;
+  }
+  @keyframes fadein { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; } }
+  .log-line .ts { color: var(--muted); flex-shrink: 0; }
+  .log-line .msg { color: var(--text); }
+  .log-line.ok .msg { color: var(--green); }
+  .log-line.err .msg { color: var(--red); }
+
+  /* ── results sections ── */
+  .results { display: flex; flex-direction: column; gap: 28px; }
+
+  .section {
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    animation: fadein 0.3s ease;
+  }
+
+  .section-head {
+    background: var(--surface);
+    padding: 10px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-head h2 {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .badge {
+    font-family: var(--mono); font-size: 10px;
+    padding: 2px 8px;
+    border: 1px solid var(--border-hi);
+    border-radius: 1px;
+    color: var(--accent);
+  }
+
+  /* keywords */
+  .keywords-wrap { padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .kw-tag {
+    font-family: var(--mono); font-size: 11px;
+    padding: 4px 10px;
+    border: 1px solid var(--border-hi);
+    border-radius: 1px;
+    color: var(--accent2);
+    background: rgba(124,158,178,0.06);
+  }
+
+  /* mode pill */
+  .mode-wrap { padding: 14px 16px; }
+  .mode-pill {
+    display: inline-block;
+    font-family: var(--mono); font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 1px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .mode-pill.discovery { background: rgba(109,171,138,0.12); color: var(--green); border: 1px solid rgba(109,171,138,0.3); }
+  .mode-pill.review    { background: rgba(201,169,110,0.12); color: var(--accent); border: 1px solid rgba(201,169,110,0.3); }
+  .mode-pill.hybrid    { background: rgba(124,158,178,0.12); color: var(--accent2); border: 1px solid rgba(124,158,178,0.3); }
+
+  /* papers */
+  .papers-list { padding: 0; }
+  .paper-item {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: 28px 1fr; gap: 12px;
+    transition: background 0.15s;
+  }
+  .paper-item:last-child { border-bottom: none; }
+  .paper-item:hover { background: rgba(255,255,255,0.02); }
+  .paper-num {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--muted); padding-top: 2px;
+  }
+  .paper-title {
+    font-family: var(--serif); font-size: 14px;
+    font-weight: 600; color: #e8e4da;
+    line-height: 1.4; margin-bottom: 4px;
+  }
+  .paper-title a { color: inherit; text-decoration: none; }
+  .paper-title a:hover { color: var(--accent); }
+  .paper-meta {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--muted); margin-bottom: 6px;
+  }
+  .paper-abstract {
+    font-size: 12px; color: #8a8799;
+    line-height: 1.6; font-family: var(--sans);
+  }
+  .src-tag {
+    display: inline-block;
+    font-family: var(--mono); font-size: 9px;
+    padding: 2px 6px; border-radius: 1px;
+    margin-left: 6px; vertical-align: middle;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .src-tag.semantic_scholar { background: rgba(201,169,110,0.1); color: var(--accent); }
+  .src-tag.arxiv { background: rgba(109,171,138,0.1); color: var(--green); }
+
+  /* bibtex */
+  .bib-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .bib-entry {
+    background: #0a0a0e;
+    border: 1px solid var(--border);
+    border-radius: 2px; padding: 12px;
+    position: relative;
+  }
+  .bib-key {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--accent); margin-bottom: 6px;
+  }
+  pre.bib-code {
+    font-family: var(--mono); font-size: 10px;
+    color: #6a6878; white-space: pre-wrap;
+    word-break: break-all; line-height: 1.6;
+    max-height: 80px; overflow: hidden;
+  }
+  .bib-entry.expanded pre.bib-code { max-height: none; }
+  .bib-toggle {
+    font-family: var(--mono); font-size: 9px;
+    color: var(--muted); cursor: pointer;
+    margin-top: 4px; display: inline-block;
+  }
+  .bib-toggle:hover { color: var(--accent); }
+
+  .download-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin: 12px 16px;
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    border-radius: 2px;
+    color: var(--text);
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 8px 16px; cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    text-decoration: none;
+  }
+  .download-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* stats bar */
+  .stats-bar {
+    display: flex; gap: 0;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+  .stat {
+    flex: 1; padding: 12px 16px;
+    border-right: 1px solid var(--border);
+    text-align: center;
+  }
+  .stat:last-child { border-right: none; }
+  .stat-val {
+    font-family: var(--mono); font-size: 20px;
+    color: var(--accent); display: block;
+  }
+  .stat-label {
+    font-family: var(--mono); font-size: 9px;
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.1em; margin-top: 3px;
+  }
+
+  /* empty state */
+  .empty {
+    padding: 24px 16px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--muted); text-align: center;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <div class="logo-mark">A1</div>
+    <div class="header-text">
+      <h1>Research Discovery Agent</h1>
+      <p>agent1 · scholarly retrieval + citation pipeline</p>
+    </div>
+  </header>
+
+  <!-- ── Query Form ── -->
+  <div class="query-form">
+    <label class="field-label" for="query">Research topic or proposal idea</label>
+    <textarea id="query" placeholder="e.g. Automated claim verification using large language models…" rows="3"></textarea>
+    <div class="form-row">
+      <select id="doctype">
+        <option value="">No document type</option>
+        <option value="proposal">Proposal</option>
+        <option value="paper">Paper</option>
+      </select>
+      <button id="run-btn" onclick="runAgent()">Run Agent</button>
+    </div>
+  </div>
+
+  <!-- ── Live Progress ── -->
+  <div class="pipeline" id="pipeline">
+    <div class="pipeline-header">
+      <div class="spinner" id="spinner"></div>
+      <span id="pipeline-status">Initialising…</span>
+    </div>
+    <div class="log-lines" id="log"></div>
+  </div>
+
+  <!-- ── Results ── -->
+  <div class="results" id="results"></div>
+
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+let currentJobId = null;
+
+function ts() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+
+function log(msg, cls='') {
+  const el = document.getElementById('log');
+  const line = document.createElement('div');
+  line.className = `log-line ${cls}`;
+  line.innerHTML = `<span class="ts">${ts()}</span><span class="msg">${msg}</span>`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearResults() {
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('log').innerHTML = '';
+}
+
+function section(id, title, badgeText='') {
+  const existing = document.getElementById(id);
+  if (existing) return existing;
+  const el = document.createElement('div');
+  el.className = 'section'; el.id = id;
+  el.innerHTML = `
+    <div class="section-head">
+      <h2>${title}</h2>
+      ${badgeText ? `<span class="badge">${badgeText}</span>` : ''}
+    </div>
+    <div class="section-body"></div>`;
+  document.getElementById('results').appendChild(el);
+  return el;
+}
+
+function sectionBody(id) {
+  return document.querySelector(`#${id} .section-body`);
+}
+
+function updateBadge(id, text) {
+  const b = document.querySelector(`#${id} .badge`);
+  if (b) b.textContent = text;
+}
+
+async function runAgent() {
+  const query = document.getElementById('query').value.trim();
+  if (!query) { alert('Please enter a research topic.'); return; }
+
+  const doctype = document.getElementById('doctype').value || null;
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  currentJobId = null;
+
+  clearResults();
+  const pipeline = document.getElementById('pipeline');
+  pipeline.classList.add('visible');
+  document.getElementById('spinner').className = 'spinner';
+  document.getElementById('pipeline-status').textContent = 'Connecting to agent…';
+
+  log('Sending query to Agent 1…');
+
+  const resp = await fetch(`${API}/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, document_type: doctype }),
+  });
+
+  if (!resp.ok) {
+    log(`HTTP error ${resp.status}`, 'err');
+    btn.disabled = false; return;
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const raw = line.slice(5).trim();
+      if (!raw) continue;
+      try {
+        const evt = JSON.parse(raw);
+        handleEvent(evt);
+      } catch(e) { /* skip malformed */ }
+    }
+  }
+
+  btn.disabled = false;
+}
+
+function handleEvent(evt) {
+  const status = document.getElementById('pipeline-status');
+
+  switch (evt.type) {
+
+    case 'step':
+      status.textContent = evt.message;
+      log(evt.message);
+      break;
+
+    case 'keywords': {
+      log(`Keywords extracted: ${evt.keywords.join(', ')}`, 'ok');
+      const sec = section('sec-keywords', 'Extracted Keywords');
+      const wrap = document.createElement('div');
+      wrap.className = 'keywords-wrap';
+      evt.keywords.forEach(k => {
+        const tag = document.createElement('span');
+        tag.className = 'kw-tag'; tag.textContent = k;
+        wrap.appendChild(tag);
+      });
+      sectionBody('sec-keywords').appendChild(wrap);
+      break;
+    }
+
+    case 'mode': {
+      log(`Mode selected: ${evt.mode.toUpperCase()}`, 'ok');
+      const sec = section('sec-mode', 'Operation Mode');
+      const wrap = document.createElement('div');
+      wrap.className = 'mode-wrap';
+      const pill = document.createElement('span');
+      pill.className = `mode-pill ${evt.mode}`; pill.textContent = evt.mode;
+      wrap.appendChild(pill);
+      sectionBody('sec-mode').appendChild(wrap);
+      break;
+    }
+
+    case 'papers': {
+      log(`${evt.count} papers found and ranked`, 'ok');
+      const sec = section('sec-papers', 'Discovered Papers', evt.count);
+      const list = document.createElement('div');
+      list.className = 'papers-list';
+
+      if (!evt.papers.length) {
+        list.innerHTML = '<div class="empty">No papers found for this query.</div>';
+      } else {
+        evt.papers.forEach((p, i) => {
+          const authors = (p.authors || []).join(', ');
+          const srcTag = `<span class="src-tag ${p.source}">${p.source === 'semantic_scholar' ? 'S2' : p.source}</span>`;
+          const titleHtml = p.url
+            ? `<a href="${p.url}" target="_blank">${p.title}</a>`
+            : p.title;
+          const item = document.createElement('div');
+          item.className = 'paper-item';
+          item.innerHTML = `
+            <div class="paper-num">${String(i+1).padStart(2,'0')}</div>
+            <div>
+              <div class="paper-title">${titleHtml}${srcTag}</div>
+              <div class="paper-meta">${authors}${p.year ? ' · ' + p.year : ''}${p.venue ? ' · ' + p.venue : ''}</div>
+              ${p.abstract ? `<div class="paper-abstract">${p.abstract}…</div>` : ''}
+            </div>`;
+          list.appendChild(item);
+        });
+      }
+      sectionBody('sec-papers').appendChild(list);
+      break;
+    }
+
+    case 'citations': {
+      currentJobId = evt.bib_job_id;
+      log(`${evt.citations.length} BibTeX citations generated`, 'ok');
+      const sec = section('sec-bib', 'BibTeX Citations', evt.citations.length);
+      const body = sectionBody('sec-bib');
+
+      // download button
+      const dlBtn = document.createElement('a');
+      dlBtn.className = 'download-btn';
+      dlBtn.href = `${API}/bib/${evt.bib_job_id}`;
+      dlBtn.download = 'citations.bib';
+      dlBtn.innerHTML = `<span>↓</span> Download .bib file`;
+      body.appendChild(dlBtn);
+
+      const bibList = document.createElement('div');
+      bibList.className = 'bib-list';
+      evt.citations.forEach(c => {
+        const entry = document.createElement('div');
+        entry.className = 'bib-entry';
+        entry.innerHTML = `
+          <div class="bib-key">@${c.key}</div>
+          <pre class="bib-code">${escHtml(c.bibtex)}</pre>
+          <span class="bib-toggle" onclick="toggleBib(this)">show more ↓</span>`;
+        bibList.appendChild(entry);
+      });
+      body.appendChild(bibList);
+      break;
+    }
+
+    case 'pdfs':
+      log(`${evt.count} PDF${evt.count !== 1 ? 's' : ''} downloaded`, evt.count > 0 ? 'ok' : '');
+      break;
+
+    case 'index':
+      log(`FAISS index built — ${evt.chunks} evidence chunks`, evt.chunks > 0 ? 'ok' : '');
+      break;
+
+    case 'retrieval': {
+      log(`${evt.results.length} local evidence chunks retrieved`, 'ok');
+      const sec = section('sec-retrieval', 'Local Evidence Retrieval', evt.results.length);
+      const list = document.createElement('div');
+      list.className = 'papers-list';
+      evt.results.forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'paper-item';
+        item.innerHTML = `
+          <div class="paper-num">#${r.rank}</div>
+          <div>
+            <div class="paper-title">${r.paper}</div>
+            <div class="paper-meta">Chunk ${r.chunk_id} · distance ${r.distance}</div>
+            <div class="paper-abstract">${r.text}…</div>
+          </div>`;
+        list.appendChild(item);
+      });
+      sectionBody('sec-retrieval').appendChild(list);
+      break;
+    }
+
+    case 'done': {
+      document.getElementById('spinner').className = 'spinner done';
+      status.textContent = 'Complete';
+      log(`Done — mode: ${evt.mode}, papers: ${evt.paper_count}, chunks: ${evt.chunk_count}`, 'ok');
+
+      // stats bar
+      const sec = section('sec-stats', 'Run Summary');
+      const bar = document.createElement('div');
+      bar.className = 'stats-bar';
+      bar.innerHTML = `
+        <div class="stat"><span class="stat-val">${evt.paper_count}</span><span class="stat-label">Papers</span></div>
+        <div class="stat"><span class="stat-val">${evt.chunk_count}</span><span class="stat-label">Evidence Chunks</span></div>
+        <div class="stat"><span class="stat-val">${evt.mode}</span><span class="stat-label">Mode</span></div>`;
+      sectionBody('sec-stats').appendChild(bar);
+      break;
+    }
+
+    case 'error':
+      log(`Error: ${evt.message}`, 'err');
+      document.getElementById('spinner').className = 'spinner done';
+      document.getElementById('pipeline-status').textContent = 'Error';
+      break;
+  }
+}
+
+function toggleBib(el) {
+  const entry = el.closest('.bib-entry');
+  entry.classList.toggle('expanded');
+  el.textContent = entry.classList.contains('expanded') ? 'show less ↑' : 'show more ↓';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

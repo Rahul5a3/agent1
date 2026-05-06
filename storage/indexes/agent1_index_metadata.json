@@ -1,0 +1,16 @@
+[
+  {
+    "faiss_id": 0,
+    "paper_title": "Evolving Art using Aesthetic Analogies - Evolutionary Supervised Learning to Generate Art with Grammatical Evolution",
+    "pdf_path": "abstract_only",
+    "chunk_id": 1,
+    "chunk_text": "In this paper we describe an evolutionary approach using models of human aesthetic experience to evolve expressions capable of generating real-time aesthetic analogies between two different artistic domains. We outline a conceptual structure used to define aesthetic analogies and guide the collection of empirical data used to build aesthetic models. We also present a Grammatical Evolution based system making use of aesthetic models with a heuristic based fitness calculation approach to evaluate evolved expressions. We demonstrate a working model that has been designed to implement this system and use the evolved expressions to generate real-time aesthetic analogies with input music and output visuals. With this system we can generate novel artistic visual displays, similar to a light show at a music concert, which can react to the musician’s performance in real-time."
+  },
+  {
+    "faiss_id": 1,
+    "paper_title": "On spontaneity, variability and directed evolution. Whether it is necessary to push foreheads inherited or acquired features?",
+    "pdf_path": "abstract_only",
+    "chunk_id": 1,
+    "chunk_text": "It seems, that historically the problem of oppose inherited features vs acquired is mainly two-causes problem. The first is an insufficient knowledge about mechanisms how acquired phenotypic feature could became inherited. \nThe second is semiotic or more precisely semantic. Any language itself contained the seeds of the problem because of ambiguous interpreting of same terms by different scientists. Human specific understanding of any term, which depends on their different education, specificity of different languages, usage of metaphors and analogies, etc., create unintended illusions of real truth. \nThis brief theoretical study attempts to consider adaptively significant traits as gradually moving from the category of non-heritable to heritable ones. The conceptual approach used makes it possible to erase the contradictions between the interrelated concepts of acquired and inherited features."
+  }
+]
